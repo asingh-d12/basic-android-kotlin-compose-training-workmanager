@@ -16,16 +16,23 @@
 
 package com.example.bluromatic.workers
 
+import android.Manifest
+import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import android.widget.Toast
 import androidx.annotation.WorkerThread
+import androidx.core.app.ActivityCompat
+import androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.example.bluromatic.CHANNEL_ID
 import com.example.bluromatic.NOTIFICATION_ID
 import com.example.bluromatic.NOTIFICATION_TITLE
@@ -50,7 +57,13 @@ private const val TAG = "WorkerUtils"
  * @param message Message shown on the notification
  * @param context Context needed to create Toast
  */
-fun makeStatusNotification(message: String, context: Context) {
+fun makeStatusNotification(
+    message: String,
+    context: Context
+) {
+
+    var canNotify = true
+
 
     // Make a channel if necessary
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -64,21 +77,37 @@ fun makeStatusNotification(message: String, context: Context) {
 
         // Add the channel
         val notificationManager =
-                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager?
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager?
 
         notificationManager?.createNotificationChannel(channel)
     }
 
     // Create the notification
     val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(NOTIFICATION_TITLE)
-            .setContentText(message)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setVibrate(LongArray(0))
+        .setSmallIcon(R.drawable.ic_launcher_foreground)
+        .setContentTitle(NOTIFICATION_TITLE)
+        .setContentText(message)
+        .setPriority(NotificationCompat.PRIORITY_HIGH)
+        .setVibrate(LongArray(0))
 
-    // Show the notification
-    NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, builder.build())
+    // In case it is Android T or above, we have to check for Permission
+    // maybe add a event here... which will call to request permission
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            canNotify = false
+            Toast.makeText(context, "Permission required to send notification", Toast.LENGTH_SHORT)
+                .show()
+        }
+    }
+
+    if (canNotify) {
+        NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, builder.build())
+    }
+
 }
 
 /**
@@ -91,8 +120,8 @@ fun makeStatusNotification(message: String, context: Context) {
 fun blurBitmap(bitmap: Bitmap, blurLevel: Int): Bitmap {
     val input = Bitmap.createScaledBitmap(
         bitmap,
-        bitmap.width/(blurLevel*5),
-        bitmap.height/(blurLevel*5),
+        bitmap.width / (blurLevel * 5),
+        bitmap.height / (blurLevel * 5),
         true
     )
     return Bitmap.createScaledBitmap(input, bitmap.width, bitmap.height, true)

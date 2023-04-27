@@ -16,9 +16,17 @@
 
 package com.example.bluromatic.ui
 
+import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.LocalActivityResultRegistryOwner
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -37,6 +45,7 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -48,14 +57,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.ExperimentalLifecycleComposeApi
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.bluromatic.R
 import com.example.bluromatic.data.BlurAmount
 import com.example.bluromatic.ui.theme.BluromaticTheme
 
-@OptIn(ExperimentalLifecycleComposeApi::class)
 @Composable
 fun BluromaticScreen(blurViewModel: BlurViewModel = viewModel(factory = BlurViewModel.Factory)) {
     val uiState by blurViewModel.blurUiState.collectAsStateWithLifecycle()
@@ -74,9 +83,51 @@ fun BluromaticScreenContent(
     blurUiState: BlurUiState,
     blurAmountOptions: List<BlurAmount>,
     applyBlur: (Int) -> Unit,
-    cancelWork: () -> Unit) {
-    var selectedValue by rememberSaveable { mutableStateOf(1) }
+    cancelWork: () -> Unit
+) {
     val context = LocalContext.current
+
+    var selectedValue by rememberSaveable { mutableStateOf(1) }
+
+    var notifyPermission by remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            mutableStateOf(
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            )
+        } else {
+            mutableStateOf(true)
+        }
+    }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            if (isGranted) {
+                notifyPermission = true
+
+                // Here run the process once permission is granted
+                applyBlur(selectedValue)
+
+            } else if (ActivityCompat.shouldShowRequestPermissionRationale(
+                    context as Activity,
+                    Manifest.permission.POST_NOTIFICATIONS
+                )
+            ) {
+                Toast.makeText(
+                    context,
+                    "Permission required to provide notifications for this",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+
+        }
+    )
+
+
+
     Column(modifier = Modifier.padding(8.dp)) {
         Image(
             painter = painterResource(R.drawable.android_cupcake),
@@ -93,7 +144,27 @@ fun BluromaticScreenContent(
         )
         BlurActions(
             blurUiState = blurUiState,
-            onGoClick = { applyBlur(selectedValue) },
+            onGoClick = {
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    // Check for notification permission if Android API Level 33+
+                    if (!notifyPermission) {
+                        launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+
+                }
+
+                // I haven't added any check to not run applyBlur if permission is not granted
+                if (notifyPermission) {
+                    applyBlur(selectedValue)
+                } else {
+                    Toast.makeText(
+                        context,
+                        "Need Notification Permission to run this",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            },
             onSeeFileClick = {},
             onCancelClick = { cancelWork() }
         )
