@@ -35,8 +35,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Button
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.RadioButton
@@ -89,6 +91,14 @@ fun BluromaticScreenContent(
 
     var selectedValue by rememberSaveable { mutableStateOf(1) }
 
+    val permissionsToCheck = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        arrayOf(Manifest.permission.POST_NOTIFICATIONS)
+    } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+        arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    } else {
+        arrayOf()
+    }
+
     var notifyPermission by remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             mutableStateOf(
@@ -102,33 +112,63 @@ fun BluromaticScreenContent(
         }
     }
 
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { isGranted ->
-            if (isGranted) {
-                notifyPermission = true
-
-                // Here run the process once permission is granted
-                applyBlur(selectedValue)
-
-            } else if (ActivityCompat.shouldShowRequestPermissionRationale(
-                    context as Activity,
-                    Manifest.permission.POST_NOTIFICATIONS
-                )
-            ) {
-                Toast.makeText(
+    var storeImageToStorage by remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            mutableStateOf(true)
+        } else {
+            mutableStateOf(
+                ContextCompat.checkSelfPermission(
                     context,
-                    "Permission required to provide notifications for this",
-                    Toast.LENGTH_SHORT
-                ).show()
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+                ) == PackageManager.PERMISSION_GRANTED
+            )
+        }
+    }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        onResult = { permissions ->
+
+            permissionsToCheck.forEach {
+                if (permissions[it] == true) {
+
+                    if (it == Manifest.permission.POST_NOTIFICATIONS) {
+                        notifyPermission = true
+                    }
+
+                    if(it == Manifest.permission.WRITE_EXTERNAL_STORAGE){
+                        storeImageToStorage = true
+                    }
+
+                    // Here run the process once permission is granted
+                    if(notifyPermission && storeImageToStorage) {
+                        applyBlur(selectedValue)
+                    }
+
+                } else if (ActivityCompat.shouldShowRequestPermissionRationale(
+                        context as Activity,
+                        it
+                    )
+                ) {
+                    Toast.makeText(
+                        context,
+                        "Permission $it required to provide this functionality",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
+
 
         }
     )
 
 
 
-    Column(modifier = Modifier.padding(8.dp)) {
+    Column(
+        modifier = Modifier
+            .padding(8.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
         Image(
             painter = painterResource(R.drawable.android_cupcake),
             contentDescription = stringResource(R.string.description_image),
@@ -149,13 +189,18 @@ fun BluromaticScreenContent(
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     // Check for notification permission if Android API Level 33+
                     if (!notifyPermission) {
-                        launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        launcher.launch(permissionsToCheck)
                     }
+                }
 
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                    if(!storeImageToStorage){
+                        launcher.launch(permissionsToCheck)
+                    }
                 }
 
                 // I haven't added any check to not run applyBlur if permission is not granted
-                if (notifyPermission) {
+                if (notifyPermission && storeImageToStorage) {
                     applyBlur(selectedValue)
                 } else {
                     Toast.makeText(

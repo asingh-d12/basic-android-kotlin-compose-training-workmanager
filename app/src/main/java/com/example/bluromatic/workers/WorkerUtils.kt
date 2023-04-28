@@ -17,22 +17,23 @@
 package com.example.bluromatic.workers
 
 import android.Manifest
-import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.WorkerThread
-import androidx.core.app.ActivityCompat
-import androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import com.example.bluromatic.CHANNEL_ID
 import com.example.bluromatic.NOTIFICATION_ID
 import com.example.bluromatic.NOTIFICATION_TITLE
@@ -44,6 +45,7 @@ import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
+import java.lang.Exception
 import java.util.UUID
 
 private const val TAG = "WorkerUtils"
@@ -156,4 +158,87 @@ fun writeBitmapToFile(applicationContext: Context, bitmap: Bitmap): Uri {
         }
     }
     return Uri.fromFile(outputFile)
+}
+
+/**
+ * In android 10 and above
+ * Store via MediaStore ContentProvider...
+ * better than working with whole scoped storage thing
+ * Here permission is only needed if reading image from another app
+ */
+fun saveImageToExternalDirAndroidQAndAbove(
+    appContext: Context,
+    displayName: String,
+    mimeType: String,
+    bitmap: Bitmap
+): Uri? {
+
+    val resolver = appContext.contentResolver
+
+    val contentValues = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
+        put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+        // If we don't provide RELATIVE_PATH -- it saves in PICTURES by default
+        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
+    }
+
+    println("MediaSore URI = ${MediaStore.Images.Media.EXTERNAL_CONTENT_URI} -- ${MediaStore.Images.Media.INTERNAL_CONTENT_URI} ")
+
+    val savedImageUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+
+    println("Saved Image URI = $savedImageUri")
+
+
+    try {
+        savedImageUri?.let { resolver.openOutputStream(it) }?.use {
+            bitmap.compress(
+                Bitmap.CompressFormat.PNG,
+                0,
+                it
+            )
+        }
+
+    } catch (e: Exception) {
+        e.printStackTrace()
+        throw e
+    }
+
+    return savedImageUri
+
+}
+
+/**
+ * This will save data in Android 9 or lower
+ * MediaStore though works Android 9 or lower.. it doesn't work 100% well
+ * though need Write Permission here
+ * also... need to get write permission approval
+ */
+fun saveImageToExternalDir(
+    displayName: String,
+    bitmap: Bitmap
+): Uri {
+
+    val file = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), displayName)
+
+    println("File Saved at ${file.toURI()}")
+
+    try {
+        file.outputStream()
+            .use {
+                bitmap.compress(
+                    Bitmap.CompressFormat.PNG,
+                    0,
+                    it
+                )
+            }
+    }catch (e: Exception){
+        e.printStackTrace()
+        throw e
+    }
+
+    return file.toUri()
+}
+
+fun checkWritePermissionToStorage(){
+
 }
