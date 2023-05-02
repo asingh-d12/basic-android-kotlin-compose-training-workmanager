@@ -76,7 +76,7 @@ class SaveImageToFileWorker(ctx: Context, params: WorkerParameters): CoroutineWo
                     val output = workDataOf(
                         KEY_IMAGE_URI to imageUrl
                     )
-                    Result.success()
+                    Result.success(output)
                 }else{
                     Log.e(TAG, applicationContext.resources.getString(R.string.writing_to_mediaStore_failed))
                     Result.failure()

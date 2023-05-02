@@ -176,14 +176,17 @@ fun saveImageToExternalDirAndroidQAndAbove(
     val resolver = appContext.contentResolver
 
     val contentValues = ContentValues().apply {
+        put(MediaStore.MediaColumns.TITLE, displayName)
         put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
         put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
         // If we don't provide RELATIVE_PATH -- it saves in PICTURES by default
         put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
+
     }
 
     println("MediaSore URI = ${MediaStore.Images.Media.EXTERNAL_CONTENT_URI} -- ${MediaStore.Images.Media.INTERNAL_CONTENT_URI} ")
 
+    // Don't use INTERNAL_CONTENT_URI - as writing to Internal Storage is not supported
     val savedImageUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
 
     println("Saved Image URI = $savedImageUri")
@@ -218,7 +221,13 @@ fun saveImageToExternalDir(
     bitmap: Bitmap
 ): Uri {
 
-    val file = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), displayName)
+    val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "SavedImages")
+
+    if (!dir.exists()) {
+        dir.mkdirs()
+    }
+
+    val file = File(dir, displayName.replace(" ", ""))
 
     println("File Saved at ${file.toURI()}")
 
@@ -231,7 +240,7 @@ fun saveImageToExternalDir(
                     it
                 )
             }
-    }catch (e: Exception){
+    } catch (e: Exception) {
         e.printStackTrace()
         throw e
     }
@@ -239,6 +248,6 @@ fun saveImageToExternalDir(
     return file.toUri()
 }
 
-fun checkWritePermissionToStorage(){
+fun checkWritePermissionToStorage() {
 
 }

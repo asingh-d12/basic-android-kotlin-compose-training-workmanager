@@ -24,22 +24,24 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
-import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Button
+import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.RadioButton
 import androidx.compose.material.RadioButtonDefaults
@@ -75,7 +77,9 @@ fun BluromaticScreen(blurViewModel: BlurViewModel = viewModel(factory = BlurView
             blurUiState = uiState,
             blurAmountOptions = blurViewModel.blurAmount,
             applyBlur = blurViewModel::applyBlur,
-            cancelWork = {}
+            cancelWork = {
+                blurViewModel.cancelWork()
+            }
         )
     }
 }
@@ -210,7 +214,9 @@ fun BluromaticScreenContent(
                     ).show()
                 }
             },
-            onSeeFileClick = {},
+            onSeeFileClick = { currentUri ->
+                showBlurredImage(context = context, currentUri = currentUri)
+            },
             onCancelClick = { cancelWork() }
         )
     }
@@ -228,7 +234,29 @@ private fun BlurActions(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center
     ) {
-        Button(onGoClick) { Text(stringResource(R.string.go)) }
+
+        println("Currently blurUiState = $blurUiState")
+
+        when(blurUiState){
+            is BlurUiState.Default -> {
+                // This is default state
+                Button(onGoClick) { Text(stringResource(R.string.go)) }
+            }
+
+            is BlurUiState.Loading -> {
+                Button(onCancelClick) { Text(stringResource(R.string.cancel_work)) }
+                CircularProgressIndicator(modifier = Modifier.padding(8.dp))
+            }
+
+            is BlurUiState.Complete -> {
+                Button(onGoClick) { Text(stringResource(R.string.go)) }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = { onSeeFileClick(blurUiState.outputUri) }) {
+                    Text(text = stringResource(id = R.string.see_file))
+                }
+            }
+        }
+
     }
 }
 
@@ -293,6 +321,13 @@ private fun showBlurredImage(context: Context, currentUri: String) {
     } else {
         null
     }
-    val actionView = Intent(Intent.ACTION_VIEW, uri)
+
+    val actionView = Intent(Intent.ACTION_VIEW, uri).apply {
+        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.Q){
+            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+            // Without adding type I get - "exposed beyond app through Intent.getData()"
+            type = "image/png"
+        }
+    }
     context.startActivity(actionView)
 }
