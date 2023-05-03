@@ -19,6 +19,7 @@ package com.example.bluromatic.data
 import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.asFlow
+import androidx.work.Constraints
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
@@ -70,14 +71,25 @@ class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
          * Class OneTimeWorkRequest comes from the AndroidX Work library while
          * OneTimeWorkRequestBuilder is a helper function provided by the WorkManager KTX extension.
          */
+
+        // Setting constraints variable...
+        val constraints = Constraints.Builder()
+            .setRequiresBatteryNotLow(true)
+            .build()
+
+        // Changed from using Simple OneTimeWorkRequest.from to builder
+        // this helps in adding the constraint
         var continuation = workManager.beginUniqueWork(
             IMAGE_MANIPULATION_WORK_NAME,
             ExistingWorkPolicy.REPLACE,
-            OneTimeWorkRequest.Companion.from(CleanupWorker::class.java)
+            OneTimeWorkRequestBuilder<CleanupWorker>().setConstraints(constraints = constraints)
+                .build()
         )
 
         // Now the BlurBuilder WorkRequest same as before
-        val blurBuilder = OneTimeWorkRequestBuilder<BlurWorker>()
+        // adding constraints to BlurBuilder
+        val blurBuilder =
+            OneTimeWorkRequestBuilder<BlurWorker>()
 
         // Adding BlurBuilder to WorkContinuation Object using .then
         continuation = continuation.then(
@@ -109,7 +121,7 @@ class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
      * Cancel any ongoing WorkRequests
      * */
     override fun cancelWork() {
-        workManager.cancelAllWorkByTag(TAG_OUTPUT)
+        workManager.cancelUniqueWork(IMAGE_MANIPULATION_WORK_NAME)
     }
 
     /**
