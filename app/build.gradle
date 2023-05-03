@@ -77,12 +77,20 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
     implementation "androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1"
     implementation "androidx.work:work-runtime-ktx:2.8.1"
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.0'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.4'
-    androidTestImplementation 'androidx.work:work-testing:2.7.1'
+
+
+
     debugImplementation "androidx.compose.ui:ui-test-manifest"
     debugImplementation "androidx.compose.ui:ui-tooling"
 
     // Work Manager
     implementation "androidx.work:work-runtime-ktx:2.8.1"
+
+    // Testing
+    // Junit
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    //Espresso
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    // Work testing
+    androidTestImplementation 'androidx.work:work-testing:2.8.1'
 }
